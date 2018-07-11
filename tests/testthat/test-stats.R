@@ -105,24 +105,37 @@ test_that("large bandwidth autocor estimates agree with acf", {
   x <- Reduce(xnext, x = w, init = 0, accumulate = TRUE)
 
   stats_est <- stats::acf(x, lag.max = 1, plot = FALSE)$acf[2, 1, 1]
-  spaero_est <- autocor(x, bandwidth = length(x) * 10)$smooth[2]
+  spaero_est <- autocor(x, est = "local_constant", kernel = "gaussian",
+                        bandwidth = length(x) * 10)$smooth[2]
   expect_equal(stats_est, spaero_est, tolerance = 0.05)
 
   stats_est <- stats::acf(x, lag.max = 1, plot = FALSE,
                           type = "covariance")$acf[2, 1, 1]
-  spaero_est <- autocor(x, bandwidth = length(x) * 10,
-                        cortype = "covariance")$smooth[2]
+  spaero_est <- autocor(x, bandwidth = length(x) * 10, est = "local_constant",
+                        kernel = "gaussian", cortype = "covariance")$smooth[2]
   expect_equal(stats_est, spaero_est, tolerance = 0.05)
 
   xnext <- function(xlast, w) 0.9 * xlast + w
   x <- Reduce(xnext, x = w, init = 0, accumulate = TRUE)
 
   stats_est <- stats::acf(x, lag.max = 1, plot = FALSE)$acf[2, 1, 1]
-  spaero_est <- autocor(x, bandwidth = length(x) * 10)$smooth[2]
+  spaero_est <- autocor(x, bandwidth = length(x) * 10, est = "local_constant",
+                        kernel = "gaussian")$smooth[2]
   expect_equal(stats_est, spaero_est, tolerance = 0.05)
 })
 
 context("expected use of get_stats")
+
+test_that("lag-0 results are sensible", {
+  bw <- 10
+  n <- 100
+  x <- rnorm(n)
+  sp <- get_stats(x, center_kernel = "uniform", center_trend = "local_constant",
+                  center_bandwidth = bw, stat_bandwidth = bw,
+                  stat_kernel = "uniform", lag = 0)
+  expect_equal(sp$stats$autocovariance, sp$stats$variance)
+  expect_equal(sp$stats$autocorrelation, rep(1, n))
+})
 
 test_that(paste("estimate of ensemble stats consistent",
                 "in case of time-dependent AR(1) model"), {
@@ -274,9 +287,10 @@ test_that(paste("Estimate of stats consistent with other methods",
   skip_on_cran()
 
   params <- c(gamma = 24, mu = 0.014, d = 0.014, eta = 1e-4, beta = 0,
-              rho = 0.9, S_0 = 1, I_0 = 0, R_0 = 0, N_0 = 1e5)
+              rho = 0.9, S_0 = 1, I_0 = 0, R_0 = 0, N_0 = 1e5, p = 0)
   covar <- data.frame(gamma_t = c(0, 0), mu_t = c(0, 0), d_t = c(0, 0),
-                      eta_t = c(0, 0), beta_t = c(0, 24e-5), time = c(0, 300))
+                      eta_t = c(0, 0), beta_t = c(0, 24e-5), p_t = c(0, 0),
+                      time = c(0, 300))
   times <- seq(0, 200, by = 1 / 12)
 
   sim <- create_simulator(params = params, times = times, covar = covar)
@@ -287,10 +301,22 @@ test_that(paste("Estimate of stats consistent with other methods",
   sp <- get_stats(diff(so[, "reports"]), center_kernel = "uniform",
                   center_trend = "local_constant", center_bandwidth = bw,
                   stat_bandwidth = bw, stat_kernel = "uniform")
+  mw <- 2 * (bw - 1) + 1
+  spbw <- get_stats(diff(so[, "reports"]), center_kernel = "uniform",
+                    center_trend = "local_constant", center_bandwidth = mw,
+                    stat_bandwidth = mw, stat_kernel = "uniform",
+                    backward_only = TRUE)
   ew <- earlywarnings::generic_ews(diff(so[, "reports"]),
-                                   winsize = 2 * bw / n * 100,
+                                   winsize = mw / n * 100,
                                    detrending = "no")
   spm <- lapply(sp$stats, function(x) x[(bw):(n - bw)])
+  spbwm <- lapply(spbw$stats, function(x) x[-seq_len(mw - 1)])
+  expect_equal(spm$mean, spbwm$mean)
+  expect_equal(as.data.frame(spm), as.data.frame(spbwm), tolerance = 0.05)
+
+  ## windows sizes and hence output lengths mismatch due to rounding
+  ## inside generic_ews
+  ew <- ew[ew$timeindex > mw - 1, ]
 
   expect_equal(ew$acf1, spm$autocorrelation, tolerance = 0.01)
   expect_equal(ew$sd, sqrt(spm$variance), tolerance = 0.01)

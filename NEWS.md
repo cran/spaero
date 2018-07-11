@@ -1,3 +1,13 @@
+# spaero 0.3.0
+
+- Add vaccination reaction to simulator. A vaccination rate of zero
+  remains the default parameter setting.
+
+- Add backward-looking window option for get_stats.
+
+- Avoid errors when input time series is constant and return a missing
+  value instead.
+
 # spaero 0.2.0
 
 - Add transmission argument to create_simulator to allow for
@@ -5,12 +15,12 @@
   remains the default model.
 
 - Add vector of first difference of the variance vector produced by
-  get_stats. This change makes it easier to use the convexity of the
+  get\_stats. This change makes it easier to use the convexity of the
   variance time series as an early warning signal. The name of the
-  vector in the stats list is variance_first_diff. Note that this
-  change makes the abbreviation stats$var ambiguous. Code using that
+  vector in the stats list is variance\_first\_diff. Note that this
+  change makes the abbreviation stats\$var ambiguous. Code using that
   abbreviation to obtain the vector of variance estimates should
-  substitute in stats$variance.
+  substitute in stats\$variance.
 
 - To the output of get_stats(), add list taus containing Kendall's
   correlation coefficient of the elements of each time series in the
