@@ -48,7 +48,7 @@ the reaction rates.
 \begin{tabular}{lll} \hline{Event}&{($\Delta S,\Delta I, \Delta R$)}&{Rate}\\
 \hline birth of a susceptible & $(1,0,0)$ & $ N_0 (\mu + \mu_t) [1 - (p + pt_t)] $\\
 death of a susceptible & $(-1,0,0)$& $S (d + d_t)$\\
-infection & $(-1,1,0)$ & $(\beta_par + \beta_par_t) I S + (\eta + \eta_t) S$\\
+infection & $(-1,1,0)$ & $(\beta + \beta_t) I S + (\eta + \eta_t) S$\\
 death of an infective & $(0,-1,0)$ & $I (d + d_t)$\\
 recovery of an infective & $(0,-1,1)$ & $I (\gamma + \gamma_t)$\\
 death of a removed & $(0,0,-1)$ & $R (d + d_t)$\\
@@ -94,12 +94,13 @@ like so:
 ```{r}
 as(simout, "data.frame")
 ```
-
-Alternatively, one can run the simulator like this to output the
-results as a data frame.
-```[r]
-simout <- pomp::simulate(sim, as.data.frame=TRUE)
-```
+Note that the covariates (i.e., the time-dependent components of the
+parameters) are included in addition to the state variables and
+observables. Also, $\beta_t$ in Table~\ref{tsymb} is named with the
+string "beta_par_t" and not "beta_t". Similarly, the parameter $\beta$
+is named "beta_par". This name was chosen because "beta" cannot be
+used in the C code defining the simulator due to conflicts with the
+name of the beta function.
 
 In addition to simulating the dynamics of disease spread, the pomp
 object also simulates imperfect observation of the dynamics. A cases
@@ -114,20 +115,24 @@ Observation times and parameters can be set at simulation run time:
 ```{r}
 pars <- sim@params
 pars["rho"] <- 0.5
-pomp::simulate(sim, params=pars, times=seq(1, 4), as.data.frame=TRUE)
+as(pomp::simulate(sim, params=pars, times=seq(1, 4)), "data.frame")
 ```
 However, the covariate table that determines the time dependence of
 rates cannot be set at simulation time.
 
 One can also set the number of replicates.
 ```{r}
-pomp::simulate(sim, nsim=2, times=seq(1, 2), as.data.frame=TRUE)
+if (utils::packageVersion("pomp") < "2.0.0") {
+  pomp::simulate(sim, nsim=2, times=seq(1, 2), as.data.frame = TRUE)
+} else {
+  pomp::simulate(sim, nsim=2, times=seq(1, 2), format = "data.frame")
+}
 ```
 
 The random number seed allows simulations to be reproduced.
 ```{r}
-pomp::simulate(sim, seed=342, as.data.frame=TRUE)
-pomp::simulate(sim, seed=342, as.data.frame=TRUE)
+as(pomp::simulate(sim, seed=342), "data.frame")
+as(pomp::simulate(sim, seed=342), "data.frame")
 ```
 
 An SIS model is also available. This model is identical to the SIR
@@ -135,7 +140,7 @@ model except that the recovery event in Table~\ref{trules} results in an
 infective individual becoming a susceptible.
 ```{r}
 sim_sis <- create_simulator(process_model="SIS")
-pomp::simulate(sim_sis, as.data.frame=TRUE)
+as(pomp::simulate(sim_sis), "data.frame")
 ```
 
 Now let's simulate data according to the SIR model where the
@@ -155,7 +160,7 @@ covar <- data.frame(gamma_t=c(0, 0), mu_t=c(0, 0), d_t=c(0, 0), eta_t=c(0, 0),
 times <- seq(0, 200, by=1/12)
 
 sim <- create_simulator(params=params, times=times, covar=covar)
-so <- pomp::simulate(sim, as.data.frame=TRUE, seed=272)
+so <- as(pomp::simulate(sim, seed=272), "data.frame")
 plot(ts(so[, "reports"], freq=12), ylab="No. reports")
 
 ```
